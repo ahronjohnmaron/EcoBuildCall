@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eco Build — Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-800 font-sans">
+  <header class="bg-[#163300] text-white"><div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-4"><div><h1 class="text-xl font-extrabold">Eco Build Admin</h1><p class="text-xs text-lime-100">Users, call logs, and activity</p></div><div class="flex gap-3"><a href="index.html" class="text-sm font-semibold text-lime-200 hover:text-white">Calendar</a><button id="signOutBtn" class="text-sm font-semibold text-white border border-lime-300/40 px-3 py-1.5 rounded-lg">Sign out</button></div></div></header>
+  <main id="adminApp" class="hidden max-w-7xl mx-auto px-4 sm:px-6 py-7">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
+      <div class="bg-white rounded-2xl border p-4"><p class="text-xs uppercase font-bold text-slate-500">Users</p><p id="userCount" class="text-3xl font-black text-[#163300]">—</p></div>
+      <div class="bg-white rounded-2xl border p-4"><p class="text-xs uppercase font-bold text-slate-500">Pending approval</p><p id="pendingCount" class="text-3xl font-black text-amber-600">—</p></div>
+      <div class="bg-white rounded-2xl border p-4"><p class="text-xs uppercase font-bold text-slate-500">Call logs</p><p id="logCount" class="text-3xl font-black text-sky-700">—</p></div>
+      <div class="bg-white rounded-2xl border p-4"><p class="text-xs uppercase font-bold text-slate-500">Today</p><p id="todayCount" class="text-3xl font-black text-emerald-700">—</p></div>
+    </div>
+    <section class="bg-white rounded-2xl border shadow-sm mb-7 overflow-hidden"><div class="p-5 border-b"><h2 class="font-extrabold text-[#163300]">User approvals & roles</h2><p class="text-sm text-slate-500">Approve new accounts and switch a user between normal user and admin.</p></div><div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-4">Username</th><th class="p-4">Role</th><th class="p-4">Status</th><th class="p-4">Created</th><th class="p-4">Actions</th></tr></thead><tbody id="usersTable"></tbody></table></div></section>
+    <section class="bg-white rounded-2xl border shadow-sm mb-7 overflow-hidden"><div class="p-5 border-b"><h2 class="font-extrabold text-[#163300]">Recent call logs</h2></div><div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-4">Date</th><th class="p-4">Prospect</th><th class="p-4">Company</th><th class="p-4">Outcome</th><th class="p-4">Owner</th></tr></thead><tbody id="logsTable"></tbody></table></div></section>
+    <section class="bg-white rounded-2xl border shadow-sm overflow-hidden"><div class="p-5 border-b"><h2 class="font-extrabold text-[#163300]">Recent activity</h2></div><div class="overflow-x-auto"><table class="w-full text-sm text-left"><thead class="bg-slate-50 text-xs uppercase text-slate-500"><tr><th class="p-4">When</th><th class="p-4">Action</th><th class="p-4">Record</th><th class="p-4">User</th></tr></thead><tbody id="activityTable"></tbody></table></div></section>
+  </main>
+  <div id="notice" class="fixed inset-0 bg-[#163300]/90 text-white flex items-center justify-center p-6 text-center"><p class="font-semibold">Checking administrator access…</p></div>
+  <script>
+    const SUPABASE_URL = 'https://qsbyiphimsmbwdgjgjca.supabase.co';
+    const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzYnlpcGhpbXNtYndkZ2pnamNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAyNjk0MDYsImV4cCI6MjEwNTg0NTQwNn0.KASh69UzJsT1ZSL2KF8DigY4J4ArukySxM5TRgiKNuY';
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    const esc = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    const when = (value) => value ? new Date(value).toLocaleString() : '—';
+
+    async function loadAdmin() {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) { window.location.replace('index.html'); return; }
+      const { data: me } = await sb.from('profiles').select('role, approved').eq('id', session.user.id).maybeSingle();
+      if (!me?.approved || me.role !== 'admin') { window.location.replace('index.html'); return; }
+      document.getElementById('notice').classList.add('hidden');
+      document.getElementById('adminApp').classList.remove('hidden');
+      const [{ data: users, error: usersError }, { data: logs, error: logsError }, { data: activity }] = await Promise.all([
+        sb.from('profiles').select('*').order('created_at', { ascending: false }),
+        sb.from('call_logs').select('id,date,prospect,company,outcome,user_id,created_at').order('created_at', { ascending: false }).limit(50),
+        sb.from('activity_log').select('*').order('created_at', { ascending: false }).limit(50)
+      ]);
+      if (usersError || logsError) { document.getElementById('notice').textContent = 'Admin tables are not set up yet. Run supabase-setup.sql first.'; document.getElementById('notice').classList.remove('hidden'); return; }
+      const profiles = users || [], callLogs = logs || [];
+      const profileById = Object.fromEntries(profiles.map((p) => [p.id, p.username]));
+      document.getElementById('userCount').textContent = profiles.length;
+      document.getElementById('pendingCount').textContent = profiles.filter((p) => !p.approved).length;
+      document.getElementById('logCount').textContent = callLogs.length;
+      const today = new Date().toISOString().slice(0, 10);
+      document.getElementById('todayCount').textContent = callLogs.filter((l) => l.date === today).length;
+      document.getElementById('usersTable').innerHTML = profiles.map((p) => `<tr class="border-t"><td class="p-4 font-semibold">${esc(p.username)}</td><td class="p-4">${esc(p.role)}</td><td class="p-4">${p.approved ? '<span class="text-emerald-700 font-semibold">Approved</span>' : '<span class="text-amber-700 font-semibold">Pending</span>'}</td><td class="p-4 text-slate-500">${when(p.created_at)}</td><td class="p-4"><button onclick="approveUser('${p.id}', ${!p.approved})" class="mr-2 text-xs font-bold px-2.5 py-1 rounded-lg border border-emerald-200 text-emerald-700">${p.approved ? 'Suspend' : 'Approve'}</button><button onclick="toggleRole('${p.id}', '${p.role}')" class="text-xs font-bold px-2.5 py-1 rounded-lg border border-sky-200 text-sky-700">Make ${p.role === 'admin' ? 'user' : 'admin'}</button></td></tr>`).join('') || '<tr><td colspan="5" class="p-4 text-slate-500">No users yet.</td></tr>';
+      document.getElementById('logsTable').innerHTML = callLogs.map((l) => `<tr class="border-t"><td class="p-4">${esc(l.date)}</td><td class="p-4 font-semibold">${esc(l.prospect)}</td><td class="p-4">${esc(l.company)}</td><td class="p-4">${esc(l.outcome)}</td><td class="p-4 text-slate-500">${esc(profileById[l.user_id] || 'Legacy record')}</td></tr>`).join('') || '<tr><td colspan="5" class="p-4 text-slate-500">No logs yet.</td></tr>';
+      document.getElementById('activityTable').innerHTML = (activity || []).map((a) => `<tr class="border-t"><td class="p-4">${when(a.created_at)}</td><td class="p-4 font-semibold">${esc(a.action)}</td><td class="p-4">${esc(a.record_id || '—')}</td><td class="p-4 text-slate-500">${esc(profileById[a.user_id] || 'System')}</td></tr>`).join('') || '<tr><td colspan="4" class="p-4 text-slate-500">No activity yet.</td></tr>';
+    }
+    window.approveUser = async (id, approved) => { const { error } = await sb.from('profiles').update({ approved }).eq('id', id); if (error) alert(error.message); else loadAdmin(); };
+    window.toggleRole = async (id, role) => { const { error } = await sb.from('profiles').update({ role: role === 'admin' ? 'user' : 'admin' }).eq('id', id); if (error) alert(error.message); else loadAdmin(); };
+    document.getElementById('signOutBtn').addEventListener('click', async () => { await sb.auth.signOut(); window.location.replace('index.html'); });
+    loadAdmin();
+  </script>
+</body>
+</html>
