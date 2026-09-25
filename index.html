@@ -235,6 +235,8 @@
             <option value="Gatekeeper">Gatekeeper Block</option>
             <option value="No Answer">No Answer / Voicemail</option>
             <option value="Not Interested">Not Interested</option>
+            <option value="Doesn't Require">Doesn't Require</option>
+            <option value="Already Have Someone">Already Have Someone</option>
           </select>
         </div>
       </div>
@@ -301,10 +303,14 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label class="block text-xs font-bold text-wise-forest uppercase tracking-wider mb-1">Phone Number</label>
             <input type="tel" id="phoneNumber" placeholder="e.g. +1 (555) 019-2834" class="w-full px-3.5 py-2.5 rounded-xl border border-wise-border bg-wise-surface focus:bg-white text-sm custom-ring" />
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-wise-forest uppercase tracking-wider mb-1">Email</label>
+            <input type="email" id="contactEmail" placeholder="e.g. name@example.com" class="w-full px-3.5 py-2.5 rounded-xl border border-wise-border bg-wise-surface focus:bg-white text-sm custom-ring" />
           </div>
           <div>
             <label class="block text-xs font-bold text-wise-forest uppercase tracking-wider mb-1">Date of Call *</label>
@@ -321,6 +327,8 @@
               <option value="Gatekeeper">🛡️ Gatekeeper Block</option>
               <option value="No Answer">📵 No Answer / Voicemail</option>
               <option value="Not Interested">❌ Not Interested</option>
+              <option value="Doesn't Require">🚫 Doesn't Require</option>
+              <option value="Already Have Someone">👤 Already Have Someone</option>
             </select>
           </div>
           <div>
@@ -538,7 +546,7 @@
       const total = callLogs.length;
       const interested = callLogs.filter(c => c.outcome === 'Interested').length;
       const followups  = callLogs.filter(c => c.outcome === 'Follow-up').length;
-      const connected  = callLogs.filter(c => ['Interested','Follow-up','Not Interested'].includes(c.outcome)).length;
+      const connected  = callLogs.filter(c => ['Interested','Follow-up','Not Interested',"Doesn't Require",'Already Have Someone'].includes(c.outcome)).length;
       document.getElementById('statTotalCalls').innerText    = total;
       document.getElementById('statInterested').innerText    = interested;
       document.getElementById('statInterestRate').innerText  = total > 0 ? `${Math.round((interested/total)*100)}% Conv.` : '0% Conv.';
@@ -595,7 +603,7 @@
     }
 
     function getOutcomeBadgeColor(o){
-      const m={'Interested':'bg-emerald-50 text-emerald-800 border-emerald-200','Follow-up':'bg-amber-50 text-amber-800 border-amber-200','Gatekeeper':'bg-purple-50 text-purple-800 border-purple-200','No Answer':'bg-slate-100 text-slate-600 border-slate-200','Not Interested':'bg-rose-50 text-rose-700 border-rose-200'};
+      const m={'Interested':'bg-emerald-50 text-emerald-800 border-emerald-200','Follow-up':'bg-amber-50 text-amber-800 border-amber-200','Gatekeeper':'bg-purple-50 text-purple-800 border-purple-200','No Answer':'bg-slate-100 text-slate-600 border-slate-200','Not Interested':'bg-rose-50 text-rose-700 border-rose-200',"Doesn't Require":'bg-orange-50 text-orange-800 border-orange-200','Already Have Someone':'bg-indigo-50 text-indigo-800 border-indigo-200'};
       return m[o]||'bg-wise-limeLight text-wise-forest border-wise-lime';
     }
     function esc(s){if(!s)return'';return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");}
@@ -810,6 +818,7 @@
 
       body.innerHTML = `
         <div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value font-mono">${esc(call.phone)||'<span class="text-slate-400">—</span>'}</span></div>
+        <div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">${esc(call.email)||'<span class="text-slate-400">—</span>'}</span></div>
         <div class="detail-row"><span class="detail-label">Date</span><span class="detail-value">${dateFormatted}</span></div>
         <div class="detail-row"><span class="detail-label">Duration</span><span class="detail-value font-mono">${esc(call.duration)||'<span class="text-slate-400">—</span>'}</span></div>
         <div class="detail-row"><span class="detail-label">Location</span><span class="detail-value">${locLink}</span></div>
@@ -868,6 +877,7 @@
         document.getElementById('prospectName').value  = existingLog.prospect || '';
         document.getElementById('companyName').value   = existingLog.company || '';
         document.getElementById('phoneNumber').value   = existingLog.phone || '';
+        document.getElementById('contactEmail').value  = existingLog.email || '';
         document.getElementById('callDate').value      = existingLog.date || '';
         document.getElementById('callOutcome').value   = existingLog.outcome || 'Interested';
         document.getElementById('callDuration').value  = existingLog.duration || '';
@@ -1098,6 +1108,7 @@
       const prospect    = document.getElementById('prospectName').value.trim();
       const company     = document.getElementById('companyName').value.trim();
       const phone       = document.getElementById('phoneNumber').value.trim();
+      const email       = document.getElementById('contactEmail').value.trim();
       const date        = document.getElementById('callDate').value;
       const outcome     = document.getElementById('callOutcome').value;
       const duration    = document.getElementById('callDuration').value.trim();
@@ -1120,7 +1131,7 @@
           image_url = await uploadVoiceFile(currentImageBlob, phone, 'images');
         }
 
-        const record = { prospect, company, phone, date, outcome, duration, location, portal_link, followup, notes };
+        const record = { prospect, company, phone, email, date, outcome, duration, location, portal_link, followup, notes };
         if (!editId) record.user_id = currentUser.id;
         record.voice_record_url = voice_record_url;
         record.image_url = image_url;
